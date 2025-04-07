@@ -14,7 +14,10 @@ const config = {
         preload: preload,
         create: create,
         update: update
-    }
+    },
+    backgroundColor: '#000000',
+    pixelArt: false,
+    roundPixels: true
 };
 
 let game;
@@ -39,17 +42,20 @@ let ammo = {
 let score = 0;
 let killFeed = [];
 let loadingProgress = 0;
+const totalAssets = 8; // Update this number based on total assets to load
 let loadingInterval;
 let isPaused = false;
+let assetsLoaded = 0;
 
 // Game states
 const GAME_STATE = {
     MENU: 'menu',
+    LOADING: 'loading',
     PLAYING: 'playing',
     GAME_OVER: 'gameOver',
     PAUSED: 'paused'
 };
-let currentState = GAME_STATE.MENU;
+let currentState = GAME_STATE.LOADING;
 
 // Weapon configurations
 const WEAPONS = {
@@ -79,70 +85,184 @@ const WEAPONS = {
     }
 };
 
-function preload() {
-    // Simulate loading progress
-    loadingInterval = setInterval(() => {
-        loadingProgress += 5;
-        document.getElementById('loadingFill').style.width = `${loadingProgress}%`;
+// Inventory system
+const INVENTORY = {
+    maxItems: 5,
+    items: [],
+    addItem: function(item) {
+        if (this.items.length < this.maxItems) {
+            this.items.push(item);
+            this.updateUI();
+            return true;
+        }
+        return false;
+    },
+    removeItem: function(index) {
+        if (index >= 0 && index < this.items.length) {
+            this.items.splice(index, 1);
+            this.updateUI();
+            return true;
+        }
+        return false;
+    },
+    useItem: function(index) {
+        if (index >= 0 && index < this.items.length) {
+            const item = this.items[index];
+            if (item.use()) {
+                this.removeItem(index);
+                return true;
+            }
+        }
+        return false;
+    },
+    updateUI: function() {
+        const inventoryElement = document.getElementById('inventory');
+        inventoryElement.innerHTML = '';
         
-        if (loadingProgress >= 100) {
-            clearInterval(loadingInterval);
+        this.items.forEach((item, index) => {
+            const itemElement = document.createElement('div');
+            itemElement.className = 'inventory-item';
+            itemElement.innerHTML = `
+                <img src="assets/items/${item.type}.png" class="item-icon">
+                <div class="item-name">${item.name}</div>
+                <div class="item-key">${index + 1}</div>
+            `;
+            inventoryElement.appendChild(itemElement);
+        });
+    }
+};
+
+// Item definitions
+const ITEMS = {
+    shield: {
+        name: 'Shield',
+        duration: 5000,
+        effect: function(player) {
+            player.isInvulnerable = true;
             setTimeout(() => {
-                document.getElementById('loadingScreen').style.display = 'none';
-                // Make sure the menu is visible after loading
-                document.getElementById('menu').style.display = 'block';
-            }, 500);
+                player.isInvulnerable = false;
+            }, this.duration);
+            return true;
         }
-    }, 100);
+    },
+    speedBoost: {
+        name: 'Speed Boost',
+        duration: 3000,
+        effect: function(player) {
+            const originalSpeed = player.speed;
+            player.speed *= 1.5;
+            setTimeout(() => {
+                player.speed = originalSpeed;
+            }, this.duration);
+            return true;
+        }
+    },
+    healthRegen: {
+        name: 'Health Regen',
+        duration: 5000,
+        effect: function(player) {
+            const healInterval = setInterval(() => {
+                if (player.health < 100) {
+                    player.health = Math.min(100, player.health + 5);
+                }
+            }, 500);
+            setTimeout(() => {
+                clearInterval(healInterval);
+            }, this.duration);
+            return true;
+        }
+    },
+    doubleJump: {
+        name: 'Double Jump',
+        duration: 4000,
+        effect: function(player) {
+            player.canDoubleJump = true;
+            setTimeout(() => {
+                player.canDoubleJump = false;
+            }, this.duration);
+            return true;
+        }
+    },
+    ammoPack: {
+        name: 'Ammo Pack',
+        effect: function(player) {
+            player.ammo = Math.min(100, player.ammo + 30);
+            return true;
+        }
+    }
+};
+
+function preload() {
+    const loadingScreen = document.getElementById('loadingScreen');
+    const loadingBar = document.getElementById('loadingFill');
+    const loadingText = document.getElementById('loadingText');
     
-    // Load game assets
-    this.load.image('robot', 'assets/robot.png');
-    this.load.image('bullet', 'assets/bullet.png');
-    this.load.image('background', 'assets/background.png');
-    this.load.image('platform', 'assets/platform.png');
-    this.load.image('healthPack', 'assets/health.png');
-    this.load.image('ammoPack', 'assets/ammo.png');
-    this.load.image('weaponPack', 'assets/weapon.png');
-    this.load.image('explosion', 'assets/explosion.png');
+    // Show loading screen
+    loadingScreen.style.display = 'flex';
     
-    // Create dummy sound objects since the actual sound files are missing
-    this.sound.add('shoot', { volume: 0.5 });
-    this.sound.add('hit', { volume: 0.5 });
-    this.sound.add('powerup', { volume: 0.5 });
-    this.sound.add('jump', { volume: 0.5 });
-    this.sound.add('death', { volume: 0.5 });
-    this.sound.add('weaponSwitch', { volume: 0.5 });
-    this.sound.add('menuSelect', { volume: 0.5 });
+    // Count total assets
+    totalAssets = 8; // Update this number when adding new assets
     
-    // Add a complete callback to ensure loading is finished
+    // Loading progress callback
+    this.load.on('progress', (value) => {
+        updateLoadingProgress(value * 100);
+    });
+    
+    // Asset load complete callback
     this.load.on('complete', () => {
-        console.log('All assets loaded successfully');
-        // Force the loading screen to hide if it's still showing
-        if (loadingProgress < 100) {
-            loadingProgress = 100;
-            document.getElementById('loadingFill').style.width = '100%';
+        // Clear any existing loading interval
+        if (loadingInterval) {
             clearInterval(loadingInterval);
-            setTimeout(() => {
-                document.getElementById('loadingScreen').style.display = 'none';
-                document.getElementById('menu').style.display = 'block';
-            }, 500);
         }
+
+        // Ensure loading bar shows 100%
+        updateLoadingProgress(100);
+
+        // Add slight delay before showing menu
+        setTimeout(() => {
+            const startButton = document.getElementById('startButton');
+            if (startButton) {
+                startButton.addEventListener('click', startGame);
+                startButton.disabled = false;
+            }
+        }, 500);
     });
     
-    // Add an error callback to handle loading failures
-    this.load.on('loaderror', (fileObj) => {
-        console.error('Error loading asset:', fileObj.key);
-        // Continue with the game even if some assets fail to load
-        if (loadingProgress < 100) {
-            loadingProgress = 100;
-            document.getElementById('loadingFill').style.width = '100%';
-            clearInterval(loadingInterval);
-            setTimeout(() => {
-                document.getElementById('loadingScreen').style.display = 'none';
-                document.getElementById('menu').style.display = 'block';
-            }, 500);
-        }
+    // Asset load error callback
+    this.load.on('loaderror', (file) => {
+        console.error('Failed to load asset:', file.key);
+        showErrorMessage(`Failed to load game asset: ${file.key}`);
     });
+    
+    // Load game assets with proper error handling
+    try {
+        this.load.image('robot', 'assets/robot.png');
+        this.load.image('bullet', 'assets/bullet.png');
+        this.load.image('background', 'assets/background.png');
+        this.load.image('platform', 'assets/platform.png');
+        this.load.image('healthPack', 'assets/health.png');
+        this.load.image('ammoPack', 'assets/ammo.png');
+        this.load.image('weaponPack', 'assets/weapon.png');
+        this.load.image('explosion', 'assets/explosion.png');
+        
+        // Load item icons
+        this.load.image('item_shield', 'assets/items/shield.svg');
+        this.load.image('item_speedBoost', 'assets/items/speedBoost.svg');
+        this.load.image('item_healthRegen', 'assets/items/healthRegen.svg');
+        this.load.image('item_doubleJump', 'assets/items/doubleJump.svg');
+        this.load.image('item_ammoPack', 'assets/items/ammoPack.svg');
+        
+        // Create dummy sound objects
+        this.sound.add('shoot', { volume: 0.5 });
+        this.sound.add('hit', { volume: 0.5 });
+        this.sound.add('powerup', { volume: 0.5 });
+        this.sound.add('jump', { volume: 0.5 });
+        this.sound.add('death', { volume: 0.5 });
+        this.sound.add('weaponSwitch', { volume: 0.5 });
+        this.sound.add('menuSelect', { volume: 0.5 });
+    } catch (error) {
+        console.error('Error in preload:', error);
+    }
 }
 
 function create() {
@@ -162,7 +282,7 @@ function create() {
     platforms.create(650, 150, 'platform');
 
     // Initialize socket connection
-    socket = io();
+    initializeSocketConnection();
 
     // Create bullets group
     bullets = this.add.group();
@@ -226,20 +346,7 @@ function create() {
 
     socket.on('playerHit', (data) => {
         if (data.targetId === socket.id) {
-            player.health -= data.damage;
-            updateHealth();
-            
-            // Add hit effect
-            this.tweens.add({
-                targets: player,
-                alpha: 0.5,
-                duration: 100,
-                yoyo: true
-            });
-            
-            if (player.health <= 0) {
-                handlePlayerDeath();
-            }
+            handlePlayerHit(data.damage);
         }
     });
 
@@ -289,6 +396,23 @@ function create() {
     this.time.addEvent({
         delay: 10000,
         callback: spawnPowerUp,
+        callbackScope: this,
+        loop: true
+    });
+
+    // Add inventory UI
+    const inventoryUI = document.createElement('div');
+    inventoryUI.id = 'inventory';
+    inventoryUI.className = 'ui-element';
+    document.getElementById('gameUI').appendChild(inventoryUI);
+    
+    // Setup inventory controls
+    setupInventoryControls.call(this);
+    
+    // Spawn items periodically
+    this.time.addEvent({
+        delay: 15000,
+        callback: spawnItem,
         callbackScope: this,
         loop: true
     });
@@ -391,13 +515,64 @@ function update() {
 }
 
 function startGame() {
-    currentState = GAME_STATE.PLAYING;
-    document.getElementById('menu').style.display = 'none';
-    document.getElementById('gameUI').style.display = 'block';
+    if (gameStarted) return;
     gameStarted = true;
+
+    const menu = document.getElementById('menu');
+    const gameUI = document.getElementById('gameUI');
+    const loadingScreen = document.getElementById('loadingScreen');
+
+    // Fade out menu and loading screen
+    menu.style.opacity = '0';
+    loadingScreen.style.opacity = '0';
+
+    // Show game UI with fade in
+    setTimeout(() => {
+        menu.style.display = 'none';
+        loadingScreen.style.display = 'none';
+        gameUI.style.display = 'flex';
+        gameUI.classList.add('visible');
+    }, 500);
+
+    // Initialize socket connection
+    socket = io();
     
-    // Play menu select sound
-    game.sound.play('menuSelect');
+    socket.on('connect', () => {
+        console.log('Connected to server');
+    });
+
+    socket.on('connect_error', (error) => {
+        showErrorMessage('Failed to connect to server. Please try again.');
+        console.error('Connection error:', error);
+    });
+
+    // ... rest of socket initialization code ...
+}
+
+function initializeSocketConnection() {
+    try {
+        socket = io();
+        setupSocketEvents();
+    } catch (error) {
+        console.error('Error connecting to server:', error);
+        showErrorMessage('Failed to connect to server. Please try again.');
+    }
+}
+
+function showErrorMessage(message) {
+    const existingError = document.querySelector('.error-message');
+    if (existingError) {
+        existingError.remove();
+    }
+
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'error-message';
+    errorDiv.textContent = message;
+    document.body.appendChild(errorDiv);
+
+    setTimeout(() => {
+        errorDiv.remove();
+    }, 5000);
 }
 
 function showControls() {
@@ -521,35 +696,66 @@ function createExplosion(scene, x, y) {
 }
 
 function collectPowerUp(powerUp) {
-    switch (powerUp.type) {
-        case 'health':
-            player.health = Math.min(100, player.health + 25);
-            updateHealth();
-            break;
-        case 'ammo':
-            ammo[currentWeapon] = Math.min(ammo[currentWeapon] + 30, WEAPONS[currentWeapon].ammoMax);
-            updateAmmo();
-            break;
-        case 'weapon':
-            const weapons = ['normal', 'shotgun', 'sniper'];
-            currentWeapon = weapons[Math.floor(Math.random() * weapons.length)];
-            updateWeapon();
-            updateAmmo();
-            break;
-    }
-    this.sound.play('powerup');
-    
-    // Add power-up collection effect
-    this.tweens.add({
-        targets: powerUp,
-        scale: 1.5,
-        alpha: 0,
-        duration: 300,
-        onComplete: () => {
-            powerUp.destroy();
-            delete powerUps[powerUp.id];
+    if (powerUp.itemData) {
+        // It's an item
+        const itemType = powerUp.itemData.type;
+        if (INVENTORY.items.length < INVENTORY.maxItems) {
+            INVENTORY.items.push(itemType);
+            updateInventory();
+            
+            // Show notification
+            addKillFeedMessage(`Collected ${ITEMS[itemType].name}`, '#00ffcc');
+            
+            // Play sound
+            this.sound.play('powerup');
+            
+            // Add collection effect
+            this.tweens.add({
+                targets: powerUp,
+                scale: 1.5,
+                alpha: 0,
+                duration: 300,
+                onComplete: () => {
+                    powerUp.destroy();
+                    delete powerUps[powerUp.itemData.id];
+                }
+            });
+        } else {
+            // Inventory full notification
+            addKillFeedMessage('Inventory full!', '#ff0000');
         }
-    });
+    } else {
+        // Original power-up logic
+        switch (powerUp.type) {
+            case 'health':
+                player.health = Math.min(100, player.health + 25);
+                updateHealth();
+                break;
+            case 'ammo':
+                ammo[currentWeapon] = Math.min(ammo[currentWeapon] + 30, WEAPONS[currentWeapon].ammoMax);
+                updateAmmo();
+                break;
+            case 'weapon':
+                const weapons = ['normal', 'shotgun', 'sniper'];
+                currentWeapon = weapons[Math.floor(Math.random() * weapons.length)];
+                updateWeapon();
+                updateAmmo();
+                break;
+        }
+        this.sound.play('powerup');
+        
+        // Add power-up collection effect
+        this.tweens.add({
+            targets: powerUp,
+            scale: 1.5,
+            alpha: 0,
+            duration: 300,
+            onComplete: () => {
+                powerUp.destroy();
+                delete powerUps[powerUp.id];
+            }
+        });
+    }
 }
 
 function doubleJump() {
@@ -706,6 +912,127 @@ function addKillFeedMessage(message, color) {
     setTimeout(() => {
         messageElement.remove();
     }, 3000);
+}
+
+// Spawn items randomly
+function spawnItem() {
+    const itemTypes = Object.keys(ITEMS);
+    const randomType = itemTypes[Math.floor(Math.random() * itemTypes.length)];
+    const item = {
+        type: randomType,
+        name: ITEMS[randomType].name,
+        use: function() {
+            return ITEMS[randomType].effect(thisScene.localPlayer);
+        }
+    };
+    
+    const x = Phaser.Math.Between(100, 700);
+    const y = Phaser.Math.Between(100, 500);
+    
+    const itemSprite = thisScene.add.sprite(x, y, 'item_' + randomType);
+    itemSprite.setInteractive();
+    itemSprite.item = item;
+    
+    thisScene.physics.add.existing(itemSprite);
+    thisScene.physics.add.overlap(thisScene.localPlayer, itemSprite, collectItem, null, thisScene);
+}
+
+// Collect item function
+function collectItem(player, itemSprite) {
+    if (INVENTORY.addItem(itemSprite.item)) {
+        itemSprite.destroy();
+        addKillFeedMessage(`${player.name} collected ${itemSprite.item.name}`);
+    }
+}
+
+// Use inventory item
+function useInventoryItem(index) {
+    INVENTORY.useItem(index - 1); // Convert 1-5 to 0-4
+}
+
+// Add keyboard controls for inventory
+thisScene.input.keyboard.on('keydown-ONE', () => useInventoryItem(1));
+thisScene.input.keyboard.on('keydown-TWO', () => useInventoryItem(2));
+thisScene.input.keyboard.on('keydown-THREE', () => useInventoryItem(3));
+thisScene.input.keyboard.on('keydown-FOUR', () => useInventoryItem(4));
+thisScene.input.keyboard.on('keydown-FIVE', () => useInventoryItem(5));
+
+// Spawn items periodically
+setInterval(spawnItem, 10000);
+
+// Add function to use inventory items
+function useInventoryItem(index) {
+    if (index >= 0 && index < INVENTORY.items.length) {
+        const itemType = INVENTORY.items[index];
+        ITEMS[itemType].effect(player);
+        
+        // Remove item from inventory
+        INVENTORY.items.splice(index, 1);
+        updateInventory();
+        
+        // Show notification
+        addKillFeedMessage(`Used ${ITEMS[itemType].name}`, '#00ffcc');
+    }
+}
+
+// Add function to update inventory UI
+function updateInventory() {
+    const inventoryElement = document.getElementById('inventory');
+    inventoryElement.innerHTML = '';
+    
+    INVENTORY.items.forEach((itemType, index) => {
+        const itemElement = document.createElement('div');
+        itemElement.className = 'inventory-item';
+        itemElement.innerHTML = `
+            <img src="assets/${ITEMS[itemType].icon}.png" class="item-icon">
+            <span class="item-name">${ITEMS[itemType].name}</span>
+            <span class="item-key">${index + 1}</span>
+        `;
+        itemElement.onclick = () => useInventoryItem(index);
+        inventoryElement.appendChild(itemElement);
+    });
+}
+
+// Add keyboard shortcuts for inventory
+function setupInventoryControls() {
+    this.input.keyboard.on('keydown-ONE', () => useInventoryItem(0));
+    this.input.keyboard.on('keydown-TWO', () => useInventoryItem(1));
+    this.input.keyboard.on('keydown-THREE', () => useInventoryItem(2));
+    this.input.keyboard.on('keydown-FOUR', () => useInventoryItem(3));
+    this.input.keyboard.on('keydown-FIVE', () => useInventoryItem(4));
+}
+
+// Modify player hit function to handle invincibility
+function handlePlayerHit(damage) {
+    if (!player.isInvincible) {
+        player.health -= damage;
+        updateHealth();
+        
+        // Add hit effect
+        this.tweens.add({
+            targets: player,
+            alpha: 0.5,
+            duration: 100,
+            yoyo: true
+        });
+        
+        if (player.health <= 0) {
+            handlePlayerDeath();
+        }
+    }
+}
+
+function updateLoadingProgress(progress) {
+    loadingProgress = Math.min(100, progress);
+    const loadingBar = document.getElementById('loadingFill');
+    const loadingText = document.getElementById('loadingText');
+    
+    if (loadingBar) {
+        loadingBar.style.width = `${loadingProgress}%`;
+    }
+    if (loadingText) {
+        loadingText.textContent = `Loading... ${Math.round(loadingProgress)}%`;
+    }
 }
 
 // Initialize game
