@@ -11,6 +11,7 @@ A multiplayer shooting game inspired by Mini Militia, built with Phaser.js, Sock
 - Power-ups (Health, Ammo, Weapon)
 - Platform-based movement
 - Score tracking
+- AI-powered image and 3D model generation
 
 ## Controls
 
@@ -38,12 +39,37 @@ cd robo-war
 npm install
 ```
 
-3. Start the development server:
+3. Create a `.env` file in the root directory with the following content:
+```
+# API Keys
+AI_API_KEY=your_api_key_here
+
+# Server Configuration
+PORT=3000
+HOST=0.0.0.0
+CORS_ORIGIN=*
+```
+
+4. Start the development server:
 ```bash
 npm run dev
 ```
 
-4. Open your browser and visit `http://localhost:3000`
+5. Open your browser and visit `http://localhost:3000`
+
+## AI Generation Features
+
+The game includes AI-powered image and 3D model generation capabilities. To use these features:
+
+1. Visit `http://localhost:3000/ai-demo.html`
+2. Enter a prompt describing the image or 3D model you want to generate
+3. Click the "Generate" button
+4. The generated content will be displayed on the page
+
+### API Endpoints
+
+- `POST /api/ai/generate-image`: Generate an image from a text prompt
+- `POST /api/ai/generate-3d-model`: Generate a 3D model from a text prompt
 
 ## Deployment
 
@@ -58,11 +84,17 @@ The game is deployed on Render.com. To deploy your own instance:
    - Build Command: `npm install`
    - Start Command: `npm start`
    - Select the free plan
+5. Add the following environment variables:
+   - `AI_API_KEY`: Your AI API key
+   - `PORT`: Server port (default: 3000)
+   - `HOST`: Server host (default: 0.0.0.0)
+   - `CORS_ORIGIN`: CORS origin for Socket.IO (default: *)
 
-5. Click "Create Web Service"
+6. Click "Create Web Service"
 
 ## Environment Variables
 
+- `AI_API_KEY`: API key for AI image and 3D model generation
 - `PORT`: Server port (default: 3000)
 - `HOST`: Server host (default: 0.0.0.0)
 - `CORS_ORIGIN`: CORS origin for Socket.IO (default: *)

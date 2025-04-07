@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Generation Demo</title>
+    <style>
+        :root {
+            --primary-color: #00ffcc;
+            --secondary-color: #00b8ff;
+            --background-dark: #1a1a2e;
+            --background-light: #16213e;
+            --text-color: #ffffff;
+            --spacing-xs: 5px;
+            --spacing-sm: 10px;
+            --spacing-md: 20px;
+            --spacing-lg: 30px;
+            --border-radius-sm: 8px;
+            --border-radius-md: 15px;
+            --border-radius-lg: 25px;
+            --transition-speed: 0.3s;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            background: linear-gradient(135deg, var(--background-dark) 0%, var(--background-light) 100%);
+            font-family: 'Orbitron', sans-serif;
+            color: var(--text-color);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: var(--spacing-lg);
+        }
+
+        h1 {
+            color: var(--primary-color);
+            margin-bottom: var(--spacing-lg);
+            text-shadow: 0 0 var(--spacing-sm) rgba(0, 255, 204, 0.5);
+            letter-spacing: 3px;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background: rgba(0, 0, 0, 0.7);
+            border-radius: var(--border-radius-md);
+            padding: var(--spacing-lg);
+            border: 1px solid var(--primary-color);
+            box-shadow: 0 0 var(--spacing-md) rgba(0, 255, 204, 0.2);
+            backdrop-filter: blur(5px);
+        }
+
+        .form-group {
+            margin-bottom: var(--spacing-md);
+        }
+
+        label {
+            display: block;
+            margin-bottom: var(--spacing-xs);
+            color: var(--primary-color);
+        }
+
+        input, textarea, select {
+            width: 100%;
+            padding: var(--spacing-sm);
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid var(--primary-color);
+            border-radius: var(--border-radius-sm);
+            color: var(--text-color);
+            font-family: inherit;
+        }
+
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        button {
+            background: linear-gradient(45deg, var(--primary-color), var(--secondary-color));
+            border: none;
+            padding: var(--spacing-sm) var(--spacing-md);
+            color: var(--text-color);
+            border-radius: var(--border-radius-lg);
+            cursor: pointer;
+            transition: all var(--transition-speed) ease;
+            font-family: inherit;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.3);
+        }
+
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 25px rgba(0, 255, 204, 0.5);
+        }
+
+        .result {
+            margin-top: var(--spacing-lg);
+            padding: var(--spacing-md);
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: var(--border-radius-sm);
+            border: 1px solid var(--primary-color);
+        }
+
+        .result img, .result iframe {
+            max-width: 100%;
+            border-radius: var(--border-radius-sm);
+            margin-top: var(--spacing-sm);
+        }
+
+        .loading {
+            display: none;
+            text-align: center;
+            margin: var(--spacing-md) 0;
+            color: var(--primary-color);
+        }
+
+        .loading.active {
+            display: block;
+        }
+
+        .error {
+            color: #ff5555;
+            margin-top: var(--spacing-sm);
+            padding: var(--spacing-sm);
+            background: rgba(255, 0, 0, 0.2);
+            border-radius: var(--border-radius-sm);
+            display: none;
+        }
+
+        .error.active {
+            display: block;
+        }
+
+        .tabs {
+            display: flex;
+            margin-bottom: var(--spacing-md);
+            border-bottom: 1px solid var(--primary-color);
+        }
+
+        .tab {
+            padding: var(--spacing-sm) var(--spacing-md);
+            cursor: pointer;
+            color: var(--text-color);
+            transition: all var(--transition-speed) ease;
+        }
+
+        .tab.active {
+            color: var(--primary-color);
+            border-bottom: 2px solid var(--primary-color);
+        }
+    </style>
+</head>
+<body>
+    <h1>AI Generation Demo</h1>
+    
+    <div class="container">
+        <div class="tabs">
+            <div class="tab active" data-tab="image">Image Generation</div>
+            <div class="tab" data-tab="3d">3D Model Generation</div>
+        </div>
+        
+        <div class="tab-content" id="image-tab">
+            <div class="form-group">
+                <label for="image-prompt">Image Prompt</label>
+                <textarea id="image-prompt" placeholder="Describe the image you want to generate..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="image-size">Image Size</label>
+                <select id="image-size">
+                    <option value="512x512">512x512</option>
+                    <option value="768x768">768x768</option>
+                    <option value="1024x1024">1024x1024</option>
+                </select>
+            </div>
+            
+            <button id="generate-image-btn">Generate Image</button>
+            
+            <div class="loading" id="image-loading">Generating image...</div>
+            <div class="error" id="image-error"></div>
+            
+            <div class="result" id="image-result"></div>
+        </div>
+        
+        <div class="tab-content" id="3d-tab" style="display: none;">
+            <div class="form-group">
+                <label for="3d-prompt">3D Model Prompt</label>
+                <textarea id="3d-prompt" placeholder="Describe the 3D model you want to generate..."></textarea>
+            </div>
+            
+            <div class="form-group">
+                <label for="3d-format">Model Format</label>
+                <select id="3d-format">
+                    <option value="glb">GLB</option>
+                    <option value="gltf">GLTF</option>
+                    <option value="obj">OBJ</option>
+                </select>
+            </div>
+            
+            <button id="generate-3d-btn">Generate 3D Model</button>
+            
+            <div class="loading" id="3d-loading">Generating 3D model...</div>
+            <div class="error" id="3d-error"></div>
+            
+            <div class="result" id="3d-result"></div>
+        </div>
+    </div>
+    
+    <script>
+        // Tab switching
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Remove active class from all tabs
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                
+                // Add active class to clicked tab
+                tab.classList.add('active');
+                
+                // Hide all tab contents
+                document.querySelectorAll('.tab-content').forEach(content => {
+                    content.style.display = 'none';
+                });
+                
+                // Show selected tab content
+                const tabId = tab.getAttribute('data-tab');
+                document.getElementById(`${tabId}-tab`).style.display = 'block';
+            });
+        });
+        
+        // Image generation
+        document.getElementById('generate-image-btn').addEventListener('click', async () => {
+            const prompt = document.getElementById('image-prompt').value;
+            const size = document.getElementById('image-size').value;
+            
+            if (!prompt) {
+                showError('image-error', 'Please enter a prompt');
+                return;
+            }
+            
+            showLoading('image-loading', true);
+            hideError('image-error');
+            clearResult('image-result');
+            
+            try {
+                const response = await fetch('/api/ai/generate-image', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        prompt,
+                        options: {
+                            size
+                        }
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResult('image-result', `<img src="${data.imageUrl}" alt="Generated image">`);
+                } else {
+                    showError('image-error', data.message || 'Error generating image');
+                }
+            } catch (error) {
+                showError('image-error', `Error: ${error.message}`);
+            } finally {
+                showLoading('image-loading', false);
+            }
+        });
+        
+        // 3D model generation
+        document.getElementById('generate-3d-btn').addEventListener('click', async () => {
+            const prompt = document.getElementById('3d-prompt').value;
+            const format = document.getElementById('3d-format').value;
+            
+            if (!prompt) {
+                showError('3d-error', 'Please enter a prompt');
+                return;
+            }
+            
+            showLoading('3d-loading', true);
+            hideError('3d-error');
+            clearResult('3d-result');
+            
+            try {
+                const response = await fetch('/api/ai/generate-3d-model', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        prompt,
+                        options: {
+                            format
+                        }
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    showResult('3d-result', `
+                        <p>3D Model URL: <a href="${data.modelUrl}" target="_blank">${data.modelUrl}</a></p>
+                        <p>You can use this model in a 3D viewer or game engine.</p>
+                    `);
+                } else {
+                    showError('3d-error', data.message || 'Error generating 3D model');
+                }
+            } catch (error) {
+                showError('3d-error', `Error: ${error.message}`);
+            } finally {
+                showLoading('3d-loading', false);
+            }
+        });
+        
+        // Helper functions
+        function showLoading(id, show) {
+            const element = document.getElementById(id);
+            if (show) {
+                element.classList.add('active');
+            } else {
+                element.classList.remove('active');
+            }
+        }
+        
+        function showError(id, message) {
+            const element = document.getElementById(id);
+            element.textContent = message;
+            element.classList.add('active');
+        }
+        
+        function hideError(id) {
+            const element = document.getElementById(id);
+            element.classList.remove('active');
+        }
+        
+        function clearResult(id) {
+            const element = document.getElementById(id);
+            element.innerHTML = '';
+        }
+        
+        function showResult(id, html) {
+            const element = document.getElementById(id);
+            element.innerHTML = html;
+        }
+    </script>
+</body>
+</html> 

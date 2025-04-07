@@ -193,15 +193,13 @@ const ITEMS = {
 };
 
 function preload() {
+    // Show loading screen
     const loadingScreen = document.getElementById('loadingScreen');
     const loadingBar = document.getElementById('loadingFill');
     const loadingText = document.getElementById('loadingText');
     
-    // Show loading screen
     loadingScreen.style.display = 'flex';
-    
-    // Count total assets
-    totalAssets = 8; // Update this number when adding new assets
+    loadingScreen.style.opacity = '1';
     
     // Loading progress callback
     this.load.on('progress', (value) => {
@@ -210,6 +208,8 @@ function preload() {
     
     // Asset load complete callback
     this.load.on('complete', () => {
+        console.log('Assets loaded successfully');
+        
         // Clear any existing loading interval
         if (loadingInterval) {
             clearInterval(loadingInterval);
@@ -218,14 +218,18 @@ function preload() {
         // Ensure loading bar shows 100%
         updateLoadingProgress(100);
 
-        // Add slight delay before showing menu
+        // Show menu after a short delay
         setTimeout(() => {
-            const startButton = document.getElementById('startButton');
-            if (startButton) {
-                startButton.addEventListener('click', startGame);
-                startButton.disabled = false;
-            }
-        }, 500);
+            loadingScreen.style.opacity = '0';
+            setTimeout(() => {
+                loadingScreen.style.display = 'none';
+                const menu = document.getElementById('menu');
+                menu.style.display = 'flex';
+                menu.style.opacity = '1';
+                currentState = GAME_STATE.MENU;
+                console.log('Showing menu');
+            }, 500);
+        }, 1000);
     });
     
     // Asset load error callback
@@ -240,9 +244,9 @@ function preload() {
         this.load.image('bullet', 'assets/bullet.png');
         this.load.image('background', 'assets/background.png');
         this.load.image('platform', 'assets/platform.png');
-        this.load.image('healthPack', 'assets/health.png');
-        this.load.image('ammoPack', 'assets/ammo.png');
-        this.load.image('weaponPack', 'assets/weapon.png');
+        this.load.image('health', 'assets/health.png');
+        this.load.image('ammo', 'assets/ammo.png');
+        this.load.image('weapon', 'assets/weapon.png');
         this.load.image('explosion', 'assets/explosion.png');
         
         // Load item icons
@@ -261,7 +265,8 @@ function preload() {
         this.sound.add('weaponSwitch', { volume: 0.5 });
         this.sound.add('menuSelect', { volume: 0.5 });
     } catch (error) {
-        console.error('Error in preload:', error);
+        console.error('Error loading assets:', error);
+        showErrorMessage('Failed to load game assets. Please refresh the page.');
     }
 }
 
@@ -281,9 +286,6 @@ function create() {
     platforms.create(350, 200, 'platform');
     platforms.create(650, 150, 'platform');
 
-    // Initialize socket connection
-    initializeSocketConnection();
-
     // Create bullets group
     bullets = this.add.group();
 
@@ -302,81 +304,11 @@ function create() {
     });
 
     // Setup UI
-    document.getElementById('healthValue').textContent = '100';
-    document.getElementById('healthFill').style.width = '100%';
-    document.getElementById('ammoCount').textContent = ammo[currentWeapon];
-    document.getElementById('weaponType').textContent = currentWeapon.toUpperCase();
-    document.getElementById('weaponIcon').style.backgroundColor = WEAPONS[currentWeapon].color;
-    document.getElementById('score').textContent = `SCORE: ${score}`;
-    document.getElementById('players').textContent = `PLAYERS: ${playerCount}`;
-
-    // Handle socket events
-    socket.on('currentPlayers', (players) => {
-        playerCount = Object.keys(players).length;
-        updatePlayerCount();
-        Object.keys(players).forEach((id) => {
-            if (id !== socket.id) {
-                addOtherPlayer(this, players[id]);
-            }
-        });
-    });
-
-    socket.on('newPlayer', (playerInfo) => {
-        playerCount++;
-        updatePlayerCount();
-        addOtherPlayer(this, playerInfo);
-        
-        // Add kill feed message
-        addKillFeedMessage(`${playerInfo.name || 'Player'} joined the game`, '#00ff00');
-    });
-
-    socket.on('playerMoved', (playerInfo) => {
-        if (otherPlayers[playerInfo.id]) {
-            otherPlayers[playerInfo.id].x = playerInfo.x;
-            otherPlayers[playerInfo.id].y = playerInfo.y;
-            otherPlayers[playerInfo.id].angle = playerInfo.angle;
-        }
-    });
-
-    socket.on('playerShot', (shootData) => {
-        if (otherPlayers[shootData.playerId]) {
-            createBullet(this, shootData.x, shootData.y, shootData.angle, shootData.weaponType);
-        }
-    });
-
-    socket.on('playerHit', (data) => {
-        if (data.targetId === socket.id) {
-            handlePlayerHit(data.damage);
-        }
-    });
-
-    socket.on('playerDied', (data) => {
-        if (data.player.id === socket.id) {
-            // Local player died
-            this.sound.play('death');
-            handlePlayerDeath();
-        } else if (data.attacker === socket.id) {
-            // We killed someone
-            score += 10;
-            updateScore();
-            addKillFeedMessage(`You eliminated ${data.player.name || 'Player'}`, '#ff0000');
-        } else {
-            // Someone else died
-            addKillFeedMessage(`${data.attacker ? data.attacker.name || 'Player' : 'Unknown'} eliminated ${data.player.name || 'Player'}`, '#ff6600');
-        }
-    });
-
-    socket.on('playerDisconnected', (playerId) => {
-        playerCount--;
-        updatePlayerCount();
-        if (otherPlayers[playerId]) {
-            otherPlayers[playerId].destroy();
-            delete otherPlayers[playerId];
-        }
-        
-        // Add kill feed message
-        addKillFeedMessage(`${otherPlayers[playerId]?.name || 'Player'} left the game`, '#00ff00');
-    });
+    document.getElementById('healthText').textContent = '100';
+    document.getElementById('ammoText').textContent = ammo[currentWeapon];
+    document.getElementById('weaponText').textContent = currentWeapon.toUpperCase();
+    document.getElementById('scoreText').textContent = `SCORE: ${score}`;
+    document.getElementById('playerCount').textContent = `PLAYERS: ${playerCount}`;
 
     // Create local player
     player = this.add.sprite(400, 300, 'robot');
@@ -392,33 +324,9 @@ function create() {
     this.physics.add.collider(player, platforms);
     this.physics.add.collider(bullets, platforms, bulletHitPlatform);
 
-    // Spawn power-ups periodically
-    this.time.addEvent({
-        delay: 10000,
-        callback: spawnPowerUp,
-        callbackScope: this,
-        loop: true
-    });
-
-    // Add inventory UI
-    const inventoryUI = document.createElement('div');
-    inventoryUI.id = 'inventory';
-    inventoryUI.className = 'ui-element';
-    document.getElementById('gameUI').appendChild(inventoryUI);
-    
-    // Setup inventory controls
-    setupInventoryControls.call(this);
-    
-    // Spawn items periodically
-    this.time.addEvent({
-        delay: 15000,
-        callback: spawnItem,
-        callbackScope: this,
-        loop: true
-    });
-
     // Initialize game state
-    document.getElementById('menu').style.display = 'block';
+    currentState = GAME_STATE.MENU;
+    document.getElementById('menu').style.display = 'flex';
     document.getElementById('gameUI').style.display = 'none';
     document.getElementById('pauseMenu').style.display = 'none';
 }
@@ -515,47 +423,49 @@ function update() {
 }
 
 function startGame() {
-    if (gameStarted) return;
-    gameStarted = true;
-
+    if (currentState !== GAME_STATE.MENU) return;
+    
     const menu = document.getElementById('menu');
     const gameUI = document.getElementById('gameUI');
-    const loadingScreen = document.getElementById('loadingScreen');
-
-    // Fade out menu and loading screen
-    menu.style.opacity = '0';
-    loadingScreen.style.opacity = '0';
-
-    // Show game UI with fade in
-    setTimeout(() => {
-        menu.style.display = 'none';
-        loadingScreen.style.display = 'none';
-        gameUI.style.display = 'flex';
-        gameUI.classList.add('visible');
-    }, 500);
 
     // Initialize socket connection
-    socket = io();
-    
-    socket.on('connect', () => {
-        console.log('Connected to server');
-    });
+    initializeSocketConnection();
 
-    socket.on('connect_error', (error) => {
-        showErrorMessage('Failed to connect to server. Please try again.');
-        console.error('Connection error:', error);
-    });
-
-    // ... rest of socket initialization code ...
+    // Hide menu with transition
+    menu.style.opacity = '0';
+    setTimeout(() => {
+        menu.style.display = 'none';
+        
+        // Show game UI
+        gameUI.style.display = 'flex';
+        setTimeout(() => {
+            gameUI.style.opacity = '1';
+            gameUI.classList.add('visible');
+            
+            // Set game state
+            currentState = GAME_STATE.PLAYING;
+            gameStarted = true;
+        }, 50);
+    }, 500);
 }
 
 function initializeSocketConnection() {
     try {
         socket = io();
+        
+        socket.on('connect', () => {
+            console.log('Connected to server');
+        });
+
+        socket.on('connect_error', (error) => {
+            console.error('Socket connection error:', error);
+            showErrorMessage('Failed to connect to game server. Please try again.');
+        });
+
         setupSocketEvents();
     } catch (error) {
-        console.error('Error connecting to server:', error);
-        showErrorMessage('Failed to connect to server. Please try again.');
+        console.error('Error initializing socket:', error);
+        showErrorMessage('Failed to initialize game connection. Please refresh the page.');
     }
 }
 
@@ -623,8 +533,7 @@ function quitGame() {
 }
 
 function updateHealth() {
-    document.getElementById('healthValue').textContent = player.health;
-    document.getElementById('healthFill').style.width = `${player.health}%`;
+    document.getElementById('healthText').textContent = player.health;
     
     // Change health bar color based on health
     if (player.health > 70) {
@@ -637,29 +546,29 @@ function updateHealth() {
 }
 
 function updateScore() {
-    document.getElementById('score').textContent = `SCORE: ${score}`;
+    document.getElementById('scoreText').textContent = `SCORE: ${score}`;
 }
 
 function updateAmmo() {
-    document.getElementById('ammoCount').textContent = ammo[currentWeapon];
+    document.getElementById('ammoText').textContent = ammo[currentWeapon];
     
     // Change ammo text color based on ammo count
     if (ammo[currentWeapon] > WEAPONS[currentWeapon].ammoMax * 0.3) {
-        document.getElementById('ammoCount').style.color = '#00ff00';
+        document.getElementById('ammoText').style.color = '#00ff00';
     } else if (ammo[currentWeapon] > WEAPONS[currentWeapon].ammoMax * 0.1) {
-        document.getElementById('ammoCount').style.color = '#ffff00';
+        document.getElementById('ammoText').style.color = '#ffff00';
     } else {
-        document.getElementById('ammoCount').style.color = '#ff0000';
+        document.getElementById('ammoText').style.color = '#ff0000';
     }
 }
 
 function updateWeapon() {
-    document.getElementById('weaponType').textContent = currentWeapon.toUpperCase();
+    document.getElementById('weaponText').textContent = currentWeapon.toUpperCase();
     document.getElementById('weaponIcon').style.backgroundColor = WEAPONS[currentWeapon].color;
 }
 
 function updatePlayerCount() {
-    document.getElementById('players').textContent = `PLAYERS: ${playerCount}`;
+    document.getElementById('playerCount').textContent = `PLAYERS: ${playerCount}`;
 }
 
 function handlePlayerDeath() {

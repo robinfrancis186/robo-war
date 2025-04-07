@@ -1,14 +1,28 @@
+// Import configuration
+const { config, validateConfig } = require('./config');
+
+// Validate environment variables
+validateConfig();
+
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http, {
     cors: {
-        origin: process.env.CORS_ORIGIN || "*",
+        origin: config.corsOrigin,
         methods: ["GET", "POST"]
     }
 });
 
+// Middleware
 app.use(express.static('public'));
+app.use(express.json());
+
+// Import routes
+const aiRoutes = require('./routes/ai');
+
+// Use routes
+app.use('/api/ai', aiRoutes);
 
 const players = new Map();
 const gameState = {
@@ -171,9 +185,11 @@ io.on('connection', (socket) => {
     });
 });
 
-const PORT = process.env.PORT || 3000;
-const HOST = process.env.HOST || '0.0.0.0';
+// Use configuration values
+const PORT = config.port;
+const HOST = config.host;
 
 http.listen(PORT, HOST, () => {
     console.log(`Server running on http://${HOST}:${PORT}`);
+    console.log(`AI API Key loaded: ${config.aiApiKey ? 'Yes' : 'No'}`);
 }); 

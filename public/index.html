@@ -507,20 +507,20 @@
     <div id="gameContainer">
         <canvas id="gameCanvas"></canvas>
         
-        <div id="loadingScreen">
-            <div id="loadingText">LOADING ROBOT ARENA</div>
+        <div id="loadingScreen" style="display: flex; opacity: 1;">
+            <div id="loadingText">Loading Robot Arena</div>
             <div id="loadingBar">
-                <div id="loadingFill"></div>
+                <div id="loadingFill" style="width: 0%;"></div>
             </div>
         </div>
         
-        <div id="menu">
+        <div id="menu" style="display: none; opacity: 0;">
             <h1>ROBOT ARENA</h1>
             <button class="menu-button" onclick="startGame()">PLAY</button>
             <button class="menu-button" onclick="showControls()">CONTROLS</button>
         </div>
         
-        <div id="gameUI">
+        <div id="gameUI" style="display: none; opacity: 0;">
             <div class="ui-element">
                 <img src="assets/health.png" class="ui-icon" alt="Health">
                 <span class="ui-text" id="healthText">100</span>
