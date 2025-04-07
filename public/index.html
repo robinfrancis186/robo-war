@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Robo War - Multiplayer Shooting Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #1a1a1a;
+            font-family: 'Arial', sans-serif;
+        }
+        #gameContainer {
+            position: relative;
+        }
+        #gameCanvas {
+            border: 2px solid #333;
+            background-color: #000;
+        }
+        #menu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            color: white;
+        }
+        #menu h1 {
+            color: #00ff00;
+            margin-bottom: 20px;
+        }
+        .menu-button {
+            background-color: #00ff00;
+            color: black;
+            border: none;
+            padding: 10px 20px;
+            margin: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        .menu-button:hover {
+            background-color: #00cc00;
+        }
+        #gameUI {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 10px;
+            color: white;
+            display: none;
+        }
+        .ui-element {
+            background-color: rgba(0, 0, 0, 0.5);
+            padding: 5px 10px;
+            border-radius: 5px;
+            margin: 5px;
+        }
+        #score {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+        }
+        #health {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+        }
+        #ammo {
+            position: fixed;
+            top: 60px;
+            right: 20px;
+        }
+        #weapon {
+            position: fixed;
+            top: 100px;
+            right: 20px;
+        }
+        #players {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="menu">
+            <h1>Robo War</h1>
+            <button class="menu-button" onclick="startGame()">Start Game</button>
+            <button class="menu-button" onclick="showControls()">Controls</button>
+        </div>
+        <div id="gameUI">
+            <div id="score" class="ui-element">Score: 0</div>
+            <div id="health" class="ui-element">Health: 100</div>
+            <div id="ammo" class="ui-element">Ammo: 100</div>
+            <div id="weapon" class="ui-element">Weapon: Normal</div>
+            <div id="players" class="ui-element">Players: 1</div>
+        </div>
+    </div>
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="js/game.js"></script>
+</body>
+</html> 
