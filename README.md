@@ -23,7 +23,7 @@ A multiplayer shooting game inspired by Mini Militia, built with Phaser.js, Sock
 
 ## Play Online
 
-You can play the game online at: [Robo War](https://robo-war.herokuapp.com)
+You can play the game online at: [Robo War](https://robo-war.onrender.com)
 
 ## Local Development
 
@@ -47,28 +47,19 @@ npm run dev
 
 ## Deployment
 
-The game is deployed on Heroku. To deploy your own instance:
+The game is deployed on Render.com. To deploy your own instance:
 
-1. Create a Heroku account and install the Heroku CLI
-2. Login to Heroku:
-```bash
-heroku login
-```
+1. Create a Render.com account
+2. Click "New" and select "Web Service"
+3. Connect your GitHub repository
+4. Configure the service:
+   - Name: robo-war (or your preferred name)
+   - Environment: Node
+   - Build Command: `npm install`
+   - Start Command: `npm start`
+   - Select the free plan
 
-3. Create a new Heroku app:
-```bash
-heroku create your-app-name
-```
-
-4. Push to Heroku:
-```bash
-git push heroku main
-```
-
-5. Open the app:
-```bash
-heroku open
-```
+5. Click "Create Web Service"
 
 ## Environment Variables
 
