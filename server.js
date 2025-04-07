@@ -13,7 +13,8 @@ app.use(express.static('public'));
 const players = new Map();
 const gameState = {
     powerUps: [],
-    lastPowerUpSpawn: Date.now()
+    lastPowerUpSpawn: Date.now(),
+    killFeed: []
 };
 
 // Spawn power-ups periodically
@@ -54,7 +55,8 @@ io.on('connection', (socket) => {
             normal: 100,
             shotgun: 30,
             sniper: 10
-        }
+        },
+        name: 'Player' + Math.floor(Math.random() * 1000)
     });
 
     // Send current game state to new player
@@ -71,6 +73,9 @@ io.on('connection', (socket) => {
             player.x = movementData.x;
             player.y = movementData.y;
             player.angle = movementData.angle;
+            if (movementData.name) {
+                player.name = movementData.name;
+            }
             socket.broadcast.emit('playerMoved', player);
         }
     });
@@ -95,16 +100,43 @@ io.on('connection', (socket) => {
                 // Player died
                 const attacker = players.get(socket.id);
                 if (attacker) {
-                    attacker.score += 1;
+                    attacker.score += 10;
                 }
                 player.health = 100;
                 player.x = Math.random() * 700 + 50;
                 player.y = Math.random() * 500 + 50;
+                
+                // Emit player death event
                 io.emit('playerDied', {
-                    player,
-                    attacker: attacker ? attacker.id : null
+                    player: {
+                        id: player.id,
+                        name: player.name
+                    },
+                    attacker: attacker ? {
+                        id: attacker.id,
+                        name: attacker.name
+                    } : null
                 });
             }
+        }
+    });
+
+    // Handle player death
+    socket.on('playerDied', (data) => {
+        const player = players.get(socket.id);
+        if (player) {
+            player.health = 100;
+            player.x = Math.random() * 700 + 50;
+            player.y = Math.random() * 500 + 50;
+            
+            // Emit player death event
+            io.emit('playerDied', {
+                player: {
+                    id: player.id,
+                    name: player.name
+                },
+                attacker: null
+            });
         }
     });
 
@@ -131,8 +163,11 @@ io.on('connection', (socket) => {
     // Handle disconnection
     socket.on('disconnect', () => {
         console.log('A player disconnected');
-        players.delete(socket.id);
-        io.emit('playerDisconnected', socket.id);
+        const player = players.get(socket.id);
+        if (player) {
+            io.emit('playerDisconnected', socket.id);
+            players.delete(socket.id);
+        }
     });
 });
 

@@ -23,11 +23,6 @@ let player;
 let otherPlayers = {};
 let cursors;
 let bullets;
-let healthText;
-let scoreText;
-let ammoText;
-let weaponText;
-let playersText;
 let powerUps = {};
 let platforms;
 let canDoubleJump = true;
@@ -41,16 +36,63 @@ let ammo = {
     shotgun: 30,
     sniper: 10
 };
+let score = 0;
+let killFeed = [];
+let loadingProgress = 0;
+let loadingInterval;
+let isPaused = false;
 
 // Game states
 const GAME_STATE = {
     MENU: 'menu',
     PLAYING: 'playing',
-    GAME_OVER: 'gameOver'
+    GAME_OVER: 'gameOver',
+    PAUSED: 'paused'
 };
 let currentState = GAME_STATE.MENU;
 
+// Weapon configurations
+const WEAPONS = {
+    normal: {
+        damage: 10,
+        fireRate: 300,
+        bulletSpeed: 400,
+        spread: 0.05,
+        ammoMax: 100,
+        color: '#00ff00'
+    },
+    shotgun: {
+        damage: 5,
+        fireRate: 800,
+        bulletSpeed: 350,
+        spread: 0.2,
+        ammoMax: 30,
+        color: '#ff00ff'
+    },
+    sniper: {
+        damage: 30,
+        fireRate: 1000,
+        bulletSpeed: 600,
+        spread: 0.01,
+        ammoMax: 10,
+        color: '#00ffff'
+    }
+};
+
 function preload() {
+    // Simulate loading progress
+    loadingInterval = setInterval(() => {
+        loadingProgress += 5;
+        document.getElementById('loadingFill').style.width = `${loadingProgress}%`;
+        
+        if (loadingProgress >= 100) {
+            clearInterval(loadingInterval);
+            setTimeout(() => {
+                document.getElementById('loadingScreen').style.display = 'none';
+            }, 500);
+        }
+    }, 100);
+    
     // Load game assets
     this.load.image('robot', 'assets/robot.png');
     this.load.image('bullet', 'assets/bullet.png');
@@ -60,10 +102,15 @@ function preload() {
     this.load.image('ammoPack', 'assets/ammo.png');
     this.load.image('weaponPack', 'assets/weapon.png');
     this.load.image('explosion', 'assets/explosion.png');
+    
+    // Load sound effects
     this.load.audio('shoot', 'assets/shoot.mp3');
     this.load.audio('hit', 'assets/hit.mp3');
     this.load.audio('powerup', 'assets/powerup.mp3');
     this.load.audio('jump', 'assets/jump.mp3');
+    this.load.audio('death', 'assets/death.mp3');
+    this.load.audio('weaponSwitch', 'assets/weapon-switch.mp3');
+    this.load.audio('menuSelect', 'assets/menu-select.mp3');
 }
 
 function create() {
@@ -76,6 +123,11 @@ function create() {
     platforms.create(600, 400, 'platform');
     platforms.create(50, 250, 'platform');
     platforms.create(750, 220, 'platform');
+    
+    // Add more platforms for better gameplay
+    platforms.create(200, 350, 'platform');
+    platforms.create(350, 200, 'platform');
+    platforms.create(650, 150, 'platform');
 
     // Initialize socket connection
     socket = io();
@@ -88,13 +140,23 @@ function create() {
     this.input.keyboard.on('keydown-SPACE', doubleJump);
     this.input.keyboard.on('keydown-Q', switchWeapon);
     this.input.keyboard.on('keydown-ESC', togglePause);
+    
+    // Add WASD controls
+    this.wasd = this.input.keyboard.addKeys({
+        up: 'W',
+        down: 'S',
+        left: 'A',
+        right: 'D'
+    });
 
     // Setup UI
-    healthText = document.getElementById('health');
-    scoreText = document.getElementById('score');
-    ammoText = document.getElementById('ammo');
-    weaponText = document.getElementById('weapon');
-    playersText = document.getElementById('players');
+    document.getElementById('healthValue').textContent = '100';
+    document.getElementById('healthFill').style.width = '100%';
+    document.getElementById('ammoCount').textContent = ammo[currentWeapon];
+    document.getElementById('weaponType').textContent = currentWeapon.toUpperCase();
+    document.getElementById('weaponIcon').style.backgroundColor = WEAPONS[currentWeapon].color;
+    document.getElementById('score').textContent = `SCORE: ${score}`;
+    document.getElementById('players').textContent = `PLAYERS: ${playerCount}`;
 
     // Handle socket events
     socket.on('currentPlayers', (players) => {
@@ -111,6 +173,9 @@ function create() {
         playerCount++;
         updatePlayerCount();
         addOtherPlayer(this, playerInfo);
+        
+        // Add kill feed message
+        addKillFeedMessage(`${playerInfo.name || 'Player'} joined the game`, '#00ff00');
     });
 
     socket.on('playerMoved', (playerInfo) => {
@@ -131,9 +196,34 @@ function create() {
         if (data.targetId === socket.id) {
             player.health -= data.damage;
             updateHealth();
+            
+            // Add hit effect
+            this.tweens.add({
+                targets: player,
+                alpha: 0.5,
+                duration: 100,
+                yoyo: true
+            });
+            
             if (player.health <= 0) {
                 handlePlayerDeath();
             }
+        }
+    });
+
+    socket.on('playerDied', (data) => {
+        if (data.player.id === socket.id) {
+            // Local player died
+            this.sound.play('death');
+            handlePlayerDeath();
+        } else if (data.attacker === socket.id) {
+            // We killed someone
+            score += 10;
+            updateScore();
+            addKillFeedMessage(`You eliminated ${data.player.name || 'Player'}`, '#ff0000');
+        } else {
+            // Someone else died
+            addKillFeedMessage(`${data.attacker ? data.attacker.name || 'Player' : 'Unknown'} eliminated ${data.player.name || 'Player'}`, '#ff6600');
         }
     });
 
@@ -144,6 +234,9 @@ function create() {
             otherPlayers[playerId].destroy();
             delete otherPlayers[playerId];
         }
+        
+        // Add kill feed message
+        addKillFeedMessage(`${otherPlayers[playerId]?.name || 'Player'} left the game`, '#00ff00');
     });
 
     // Create local player
@@ -154,6 +247,7 @@ function create() {
     player.body.setBounce(0.2);
     player.health = 100;
     player.score = 0;
+    player.name = 'Player' + Math.floor(Math.random() * 1000);
 
     // Setup collisions
     this.physics.add.collider(player, platforms);
@@ -170,24 +264,25 @@ function create() {
     // Initialize game state
     document.getElementById('menu').style.display = 'block';
     document.getElementById('gameUI').style.display = 'none';
+    document.getElementById('pauseMenu').style.display = 'none';
 }
 
 function update() {
-    if (currentState !== GAME_STATE.PLAYING) return;
+    if (currentState !== GAME_STATE.PLAYING || isPaused) return;
 
     if (player) {
         // Player movement
         const speed = 160;
-        if (cursors.left.isDown) {
+        if (cursors.left.isDown || this.wasd.left.isDown) {
             player.body.setVelocityX(-speed);
-        } else if (cursors.right.isDown) {
+        } else if (cursors.right.isDown || this.wasd.right.isDown) {
             player.body.setVelocityX(speed);
         } else {
             player.body.setVelocityX(0);
         }
 
         // Jumping
-        if (cursors.up.isDown && player.body.touching.down) {
+        if ((cursors.up.isDown || this.wasd.up.isDown) && player.body.touching.down) {
             player.body.setVelocityY(-400);
             hasJumped = true;
             canDoubleJump = true;
@@ -206,7 +301,8 @@ function update() {
         socket.emit('playerMovement', {
             x: player.x,
             y: player.y,
-            angle: player.rotation
+            angle: player.rotation,
+            name: player.name
         });
 
         // Shooting
@@ -236,7 +332,7 @@ function update() {
     // Update bullets
     bullets.children.each((bullet) => {
         // Move bullet
-        const speed = bullet.speed || 10;
+        const speed = bullet.speed || WEAPONS[bullet.weaponType].bulletSpeed;
         bullet.x += Math.cos(bullet.rotation) * speed;
         bullet.y += Math.sin(bullet.rotation) * speed;
 
@@ -248,12 +344,17 @@ function update() {
             )) {
                 socket.emit('playerHit', {
                     targetId: otherPlayer.playerId,
-                    damage: getWeaponDamage(bullet.weaponType)
+                    damage: WEAPONS[bullet.weaponType].damage
                 });
                 createExplosion(this, bullet.x, bullet.y);
                 bullet.destroy();
             }
         });
+        
+        // Remove bullets that go off screen
+        if (bullet.x < 0 || bullet.x > 800 || bullet.y < 0 || bullet.y > 600) {
+            bullet.destroy();
+        }
     });
 }
 
@@ -262,48 +363,96 @@ function startGame() {
     document.getElementById('menu').style.display = 'none';
     document.getElementById('gameUI').style.display = 'block';
     gameStarted = true;
+    
+    // Play menu select sound
+    game.sound.play('menuSelect');
 }
 
 function showControls() {
-    alert(
-        'Controls:\n' +
-        'Arrow Keys: Move\n' +
-        'Space: Jump/Double Jump\n' +
-        'Mouse: Aim\n' +
-        'Left Click: Shoot\n' +
-        'Q: Switch Weapons\n' +
-        'ESC: Pause'
-    );
+    // Play menu select sound
+    game.sound.play('menuSelect');
+    
+    // Show controls in a more stylish way
+    const controlsDiv = document.getElementById('controls');
+    controlsDiv.style.display = 'block';
+    
+    setTimeout(() => {
+        controlsDiv.style.display = 'none';
+    }, 5000);
 }
 
 function togglePause() {
     if (currentState === GAME_STATE.PLAYING) {
-        currentState = GAME_STATE.MENU;
-        document.getElementById('menu').style.display = 'block';
-    } else if (currentState === GAME_STATE.MENU && gameStarted) {
-        currentState = GAME_STATE.PLAYING;
-        document.getElementById('menu').style.display = 'none';
+        isPaused = true;
+        document.getElementById('pauseMenu').style.display = 'block';
+        game.sound.pauseAll();
+    } else if (currentState === GAME_STATE.PAUSED) {
+        resumeGame();
+    }
+}
+
+function resumeGame() {
+    isPaused = false;
+    document.getElementById('pauseMenu').style.display = 'none';
+    game.sound.resumeAll();
+    game.sound.play('menuSelect');
+}
+
+function quitGame() {
+    isPaused = false;
+    currentState = GAME_STATE.MENU;
+    document.getElementById('pauseMenu').style.display = 'none';
+    document.getElementById('menu').style.display = 'block';
+    game.sound.resumeAll();
+    game.sound.play('menuSelect');
+    
+    // Reset player
+    if (player) {
+        player.x = 400;
+        player.y = 300;
+        player.health = 100;
+        updateHealth();
     }
 }
 
 function updateHealth() {
-    healthText.textContent = `Health: ${player.health}`;
+    document.getElementById('healthValue').textContent = player.health;
+    document.getElementById('healthFill').style.width = `${player.health}%`;
+    
+    // Change health bar color based on health
+    if (player.health > 70) {
+        document.getElementById('healthFill').style.backgroundColor = '#00ff00';
+    } else if (player.health > 30) {
+        document.getElementById('healthFill').style.backgroundColor = '#ffff00';
+    } else {
+        document.getElementById('healthFill').style.backgroundColor = '#ff0000';
+    }
 }
 
 function updateScore() {
-    scoreText.textContent = `Score: ${player.score}`;
+    document.getElementById('score').textContent = `SCORE: ${score}`;
 }
 
 function updateAmmo() {
-    ammoText.textContent = `Ammo: ${ammo[currentWeapon]}`;
+    document.getElementById('ammoCount').textContent = ammo[currentWeapon];
+    
+    // Change ammo text color based on ammo count
+    if (ammo[currentWeapon] > WEAPONS[currentWeapon].ammoMax * 0.3) {
+        document.getElementById('ammoCount').style.color = '#00ff00';
+    } else if (ammo[currentWeapon] > WEAPONS[currentWeapon].ammoMax * 0.1) {
+        document.getElementById('ammoCount').style.color = '#ffff00';
+    } else {
+        document.getElementById('ammoCount').style.color = '#ff0000';
+    }
 }
 
 function updateWeapon() {
-    weaponText.textContent = `Weapon: ${currentWeapon.charAt(0).toUpperCase() + currentWeapon.slice(1)}`;
+    document.getElementById('weaponType').textContent = currentWeapon.toUpperCase();
+    document.getElementById('weaponIcon').style.backgroundColor = WEAPONS[currentWeapon].color;
 }
 
 function updatePlayerCount() {
-    playersText.textContent = `Players: ${playerCount}`;
+    document.getElementById('players').textContent = `PLAYERS: ${playerCount}`;
 }
 
 function handlePlayerDeath() {
@@ -312,14 +461,30 @@ function handlePlayerDeath() {
     player.y = Math.random() * 500 + 50;
     updateHealth();
     createExplosion(this, player.x, player.y);
+    
+    // Emit player death
+    socket.emit('playerDied', {
+        player: {
+            id: socket.id,
+            name: player.name
+        }
+    });
 }
 
 function createExplosion(scene, x, y) {
     const explosion = scene.add.sprite(x, y, 'explosion');
     explosion.setScale(0.5);
     scene.sound.play('hit');
-    scene.time.delayedCall(500, () => {
-        explosion.destroy();
+    
+    // Add explosion animation
+    scene.tweens.add({
+        targets: explosion,
+        scale: 1,
+        alpha: 0,
+        duration: 500,
+        onComplete: () => {
+            explosion.destroy();
+        }
     });
 }
 
@@ -330,7 +495,7 @@ function collectPowerUp(powerUp) {
             updateHealth();
             break;
         case 'ammo':
-            ammo[currentWeapon] = Math.min(ammo[currentWeapon] + 30, 100);
+            ammo[currentWeapon] = Math.min(ammo[currentWeapon] + 30, WEAPONS[currentWeapon].ammoMax);
             updateAmmo();
             break;
         case 'weapon':
@@ -341,8 +506,18 @@ function collectPowerUp(powerUp) {
             break;
     }
     this.sound.play('powerup');
-    powerUp.destroy();
-    delete powerUps[powerUp.id];
+    
+    // Add power-up collection effect
+    this.tweens.add({
+        targets: powerUp,
+        scale: 1.5,
+        alpha: 0,
+        duration: 300,
+        onComplete: () => {
+            powerUp.destroy();
+            delete powerUps[powerUp.id];
+        }
+    });
 }
 
 function doubleJump() {
@@ -359,15 +534,21 @@ function switchWeapon() {
     currentWeapon = weapons[(currentIndex + 1) % weapons.length];
     updateWeapon();
     updateAmmo();
+    
+    // Play weapon switch sound
+    this.sound.play('weaponSwitch');
+    
+    // Add weapon switch effect
+    this.tweens.add({
+        targets: player,
+        alpha: 0.7,
+        duration: 100,
+        yoyo: true
+    });
 }
 
 function getWeaponDamage(weaponType) {
-    switch (weaponType) {
-        case 'normal': return 10;
-        case 'shotgun': return 5;
-        case 'sniper': return 30;
-        default: return 10;
-    }
+    return WEAPONS[weaponType].damage;
 }
 
 function spawnPowerUp() {
@@ -381,12 +562,30 @@ function spawnPowerUp() {
     this.physics.add.existing(powerUp);
     powerUp.type = type;
     
+    // Add floating animation
+    this.tweens.add({
+        targets: powerUp,
+        y: y - 10,
+        duration: 1000,
+        yoyo: true,
+        repeat: -1
+    });
+    
     powerUps[powerUp.id] = powerUp;
     
     // Remove power-up after 10 seconds
     this.time.delayedCall(10000, () => {
-        powerUp.destroy();
-        delete powerUps[powerUp.id];
+        if (powerUps[powerUp.id]) {
+            this.tweens.add({
+                targets: powerUp,
+                alpha: 0,
+                duration: 500,
+                onComplete: () => {
+                    powerUp.destroy();
+                    delete powerUps[powerUp.id];
+                }
+            });
+        }
     });
 }
 
@@ -399,9 +598,20 @@ function addOtherPlayer(self, playerInfo) {
     const otherPlayer = self.add.sprite(playerInfo.x, playerInfo.y, 'robot');
     otherPlayer.setScale(0.5);
     otherPlayer.playerId = playerInfo.id;
+    otherPlayer.name = playerInfo.name || 'Player';
     otherPlayers[playerInfo.id] = otherPlayer;
     self.physics.add.existing(otherPlayer);
     self.physics.add.collider(otherPlayer, platforms);
+    
+    // Add player name label
+    const nameLabel = self.add.text(0, -20, otherPlayer.name, {
+        fontSize: '12px',
+        fill: '#ffffff',
+        stroke: '#000000',
+        strokeThickness: 3
+    });
+    nameLabel.setOrigin(0.5);
+    otherPlayer.add(nameLabel);
 }
 
 function createBullet(self, x, y, angle, weaponType = 'normal') {
@@ -410,17 +620,12 @@ function createBullet(self, x, y, angle, weaponType = 'normal') {
     bullet.rotation = angle;
     bullet.weaponType = weaponType;
     
-    switch (weaponType) {
-        case 'normal':
-            bullet.speed = 10;
-            break;
-        case 'shotgun':
-            bullet.speed = 8;
-            break;
-        case 'sniper':
-            bullet.speed = 15;
-            break;
-    }
+    // Add spread to bullet
+    const spread = WEAPONS[weaponType].spread;
+    bullet.rotation += (Math.random() - 0.5) * spread;
+    
+    // Set bullet color based on weapon type
+    bullet.setTint(WEAPONS[weaponType].color.replace('#', '0x'));
     
     bullets.add(bullet);
     self.sound.play('shoot');
@@ -454,6 +659,21 @@ function shoot(self) {
         angle: player.rotation,
         weaponType: currentWeapon
     });
+}
+
+function addKillFeedMessage(message, color) {
+    const killFeed = document.getElementById('killFeed');
+    const messageElement = document.createElement('div');
+    messageElement.className = 'kill-message';
+    messageElement.textContent = message;
+    messageElement.style.color = color;
+    
+    killFeed.appendChild(messageElement);
+    
+    // Remove message after animation completes
+    setTimeout(() => {
+        messageElement.remove();
+    }, 3000);
 }
 
 // Initialize game

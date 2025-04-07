@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Robo War - Multiplayer Shooting Game</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
     <style>
         body {
             margin: 0;
@@ -12,32 +13,210 @@
             justify-content: center;
             align-items: center;
             min-height: 100vh;
-            background-color: #1a1a1a;
-            font-family: 'Arial', sans-serif;
+            background-color: #0a0a0a;
+            font-family: 'Orbitron', sans-serif;
+            color: #fff;
+            overflow: hidden;
         }
         #gameContainer {
             position: relative;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.3);
+            border-radius: 10px;
+            overflow: hidden;
         }
         #gameCanvas {
-            border: 2px solid #333;
+            border: 2px solid #00ff00;
             background-color: #000;
+            border-radius: 8px;
         }
         #menu {
             position: absolute;
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%);
-            background-color: rgba(0, 0, 0, 0.8);
-            padding: 20px;
-            border-radius: 10px;
+            background-color: rgba(0, 0, 0, 0.85);
+            padding: 30px;
+            border-radius: 15px;
             text-align: center;
             color: white;
+            border: 2px solid #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+            min-width: 300px;
         }
         #menu h1 {
             color: #00ff00;
-            margin-bottom: 20px;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 0 0 10px rgba(0, 255, 0, 0.7);
+            letter-spacing: 2px;
         }
         .menu-button {
+            background-color: #00ff00;
+            color: black;
+            border: none;
+            padding: 12px 24px;
+            margin: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: bold;
+            transition: all 0.3s;
+            width: 80%;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .menu-button:hover {
+            background-color: #00cc00;
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(0, 255, 0, 0.7);
+        }
+        .menu-button:active {
+            transform: scale(0.95);
+        }
+        #gameUI {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            padding: 15px;
+            color: white;
+            display: none;
+            pointer-events: none;
+        }
+        .ui-element {
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 8px 15px;
+            border-radius: 5px;
+            margin: 5px;
+            border: 1px solid #00ff00;
+            font-size: 14px;
+            text-shadow: 0 0 5px rgba(0, 255, 0, 0.5);
+        }
+        #score {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            font-size: 18px;
+            font-weight: bold;
+        }
+        #health {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+        }
+        #healthBar {
+            width: 100px;
+            height: 10px;
+            background-color: #333;
+            border-radius: 5px;
+            margin-left: 10px;
+            overflow: hidden;
+        }
+        #healthFill {
+            height: 100%;
+            width: 100%;
+            background-color: #00ff00;
+            transition: width 0.3s;
+        }
+        #ammo {
+            position: fixed;
+            top: 60px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+        }
+        #ammoCount {
+            margin-left: 10px;
+            font-weight: bold;
+        }
+        #weapon {
+            position: fixed;
+            top: 100px;
+            right: 20px;
+            display: flex;
+            align-items: center;
+        }
+        #weaponIcon {
+            width: 24px;
+            height: 24px;
+            margin-left: 10px;
+            background-color: #00ff00;
+            border-radius: 3px;
+        }
+        #players {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 16px;
+            font-weight: bold;
+        }
+        #killFeed {
+            position: fixed;
+            top: 60px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 300px;
+            text-align: center;
+        }
+        .kill-message {
+            background-color: rgba(0, 0, 0, 0.7);
+            color: #ff0000;
+            padding: 5px 10px;
+            border-radius: 5px;
+            margin: 5px 0;
+            animation: fadeOut 3s forwards;
+        }
+        @keyframes fadeOut {
+            0% { opacity: 1; }
+            70% { opacity: 1; }
+            100% { opacity: 0; }
+        }
+        #controls {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background-color: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #00ff00;
+            font-size: 12px;
+            max-width: 200px;
+        }
+        #controls h3 {
+            margin-top: 0;
+            color: #00ff00;
+        }
+        #controls ul {
+            padding-left: 20px;
+            margin: 5px 0;
+        }
+        #controls li {
+            margin: 3px 0;
+        }
+        #pauseMenu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.9);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            color: white;
+            border: 2px solid #00ff00;
+            box-shadow: 0 0 20px rgba(0, 255, 0, 0.5);
+            display: none;
+            z-index: 100;
+        }
+        #pauseMenu h2 {
+            color: #00ff00;
+            margin-bottom: 20px;
+        }
+        .pause-button {
             background-color: #00ff00;
             color: black;
             border: none;
@@ -46,68 +225,101 @@
             border-radius: 5px;
             cursor: pointer;
             font-size: 16px;
-            transition: background-color 0.3s;
+            font-family: 'Orbitron', sans-serif;
+            font-weight: bold;
+            transition: all 0.3s;
+            width: 80%;
         }
-        .menu-button:hover {
+        .pause-button:hover {
             background-color: #00cc00;
+            transform: scale(1.05);
         }
-        #gameUI {
+        #loadingScreen {
             position: absolute;
             top: 0;
             left: 0;
             width: 100%;
-            padding: 10px;
-            color: white;
-            display: none;
+            height: 100%;
+            background-color: #000;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
         }
-        .ui-element {
-            background-color: rgba(0, 0, 0, 0.5);
-            padding: 5px 10px;
-            border-radius: 5px;
-            margin: 5px;
+        #loadingBar {
+            width: 300px;
+            height: 20px;
+            background-color: #333;
+            border-radius: 10px;
+            margin-top: 20px;
+            overflow: hidden;
         }
-        #score {
-            position: fixed;
-            top: 20px;
-            left: 20px;
+        #loadingFill {
+            height: 100%;
+            width: 0%;
+            background-color: #00ff00;
+            transition: width 0.3s;
         }
-        #health {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-        }
-        #ammo {
-            position: fixed;
-            top: 60px;
-            right: 20px;
-        }
-        #weapon {
-            position: fixed;
-            top: 100px;
-            right: 20px;
-        }
-        #players {
-            position: fixed;
-            top: 20px;
-            left: 50%;
-            transform: translateX(-50%);
+        #loadingText {
+            color: #00ff00;
+            font-size: 18px;
+            margin-bottom: 10px;
         }
     </style>
 </head>
 <body>
     <div id="gameContainer">
         <canvas id="gameCanvas"></canvas>
-        <div id="menu">
-            <h1>Robo War</h1>
-            <button class="menu-button" onclick="startGame()">Start Game</button>
-            <button class="menu-button" onclick="showControls()">Controls</button>
+        
+        <div id="loadingScreen">
+            <div id="loadingText">LOADING ROBOT ARENA</div>
+            <div id="loadingBar">
+                <div id="loadingFill"></div>
+            </div>
         </div>
+        
+        <div id="menu">
+            <h1>ROBO WAR</h1>
+            <button class="menu-button" onclick="startGame()">START GAME</button>
+            <button class="menu-button" onclick="showControls()">CONTROLS</button>
+        </div>
+        
+        <div id="pauseMenu">
+            <h2>PAUSED</h2>
+            <button class="pause-button" onclick="resumeGame()">RESUME</button>
+            <button class="pause-button" onclick="quitGame()">QUIT</button>
+        </div>
+        
         <div id="gameUI">
-            <div id="score" class="ui-element">Score: 0</div>
-            <div id="health" class="ui-element">Health: 100</div>
-            <div id="ammo" class="ui-element">Ammo: 100</div>
-            <div id="weapon" class="ui-element">Weapon: Normal</div>
-            <div id="players" class="ui-element">Players: 1</div>
+            <div id="score" class="ui-element">SCORE: 0</div>
+            <div id="health" class="ui-element">
+                HEALTH: <span id="healthValue">100</span>
+                <div id="healthBar">
+                    <div id="healthFill"></div>
+                </div>
+            </div>
+            <div id="ammo" class="ui-element">
+                AMMO: <span id="ammoCount">100</span>
+            </div>
+            <div id="weapon" class="ui-element">
+                WEAPON: <span id="weaponType">NORMAL</span>
+                <div id="weaponIcon"></div>
+            </div>
+            <div id="players" class="ui-element">PLAYERS: 1</div>
+            <div id="killFeed"></div>
+        </div>
+        
+        <div id="controls">
+            <h3>CONTROLS</h3>
+            <ul>
+                <li>WASD / ARROWS: Move</li>
+                <li>SPACE: Jump</li>
+                <li>MOUSE: Aim</li>
+                <li>LEFT CLICK: Shoot</li>
+                <li>Q: Switch Weapon</li>
+                <li>ESC: Pause</li>
+            </ul>
         </div>
     </div>
     <script src="/socket.io/socket.io.js"></script>
