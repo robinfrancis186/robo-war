@@ -89,6 +89,8 @@ function preload() {
             clearInterval(loadingInterval);
             setTimeout(() => {
                 document.getElementById('loadingScreen').style.display = 'none';
+                // Make sure the menu is visible after loading
+                document.getElementById('menu').style.display = 'block';
             }, 500);
         }
     }, 100);
@@ -111,6 +113,36 @@ function preload() {
     this.load.audio('death', 'assets/death.mp3');
     this.load.audio('weaponSwitch', 'assets/weapon-switch.mp3');
     this.load.audio('menuSelect', 'assets/menu-select.mp3');
+    
+    // Add a complete callback to ensure loading is finished
+    this.load.on('complete', () => {
+        console.log('All assets loaded successfully');
+        // Force the loading screen to hide if it's still showing
+        if (loadingProgress < 100) {
+            loadingProgress = 100;
+            document.getElementById('loadingFill').style.width = '100%';
+            clearInterval(loadingInterval);
+            setTimeout(() => {
+                document.getElementById('loadingScreen').style.display = 'none';
+                document.getElementById('menu').style.display = 'block';
+            }, 500);
+        }
+    });
+    
+    // Add an error callback to handle loading failures
+    this.load.on('loaderror', (fileObj) => {
+        console.error('Error loading asset:', fileObj.key);
+        // Continue with the game even if some assets fail to load
+        if (loadingProgress < 100) {
+            loadingProgress = 100;
+            document.getElementById('loadingFill').style.width = '100%';
+            clearInterval(loadingInterval);
+            setTimeout(() => {
+                document.getElementById('loadingScreen').style.display = 'none';
+                document.getElementById('menu').style.display = 'block';
+            }, 500);
+        }
+    });
 }
 
 function create() {
