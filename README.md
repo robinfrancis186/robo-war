@@ -1,12 +1,12 @@
 # Robo War
 
-A multiplayer robot shooting game inspired by Mini Militia, built with Node.js, Socket.IO, and Phaser 3.
+A multiplayer shooting game inspired by Mini Militia, built with Phaser.js, Socket.IO, and Node.js.
 
 ## Features
 
-- Multiplayer real-time gameplay
+- Real-time multiplayer gameplay
+- Three different weapons (Normal, Shotgun, Sniper)
 - Double jump ability
-- Multiple weapons (Normal, Shotgun, Sniper)
 - Health regeneration
 - Power-ups (Health, Ammo, Weapon)
 - Platform-based movement
@@ -19,27 +19,66 @@ A multiplayer robot shooting game inspired by Mini Militia, built with Node.js, 
 - Mouse: Aim
 - Left Click: Shoot
 - Q: Switch Weapons
+- ESC: Pause
 
-## Installation
+## Play Online
 
-1. Make sure you have Node.js installed
-2. Clone this repository
-3. Install dependencies:
-   ```bash
-   npm install
-   ```
-4. Start the server:
-   ```bash
-   npm start
-   ```
-5. Open your browser and navigate to `http://localhost:3000`
+You can play the game online at: [Robo War](https://robo-war.herokuapp.com)
 
-## Development
+## Local Development
 
-To run the server in development mode with auto-reload:
+1. Clone the repository:
+```bash
+git clone https://github.com/robinfrancis186/robo-war.git
+cd robo-war
+```
+
+2. Install dependencies:
+```bash
+npm install
+```
+
+3. Start the development server:
 ```bash
 npm run dev
 ```
+
+4. Open your browser and visit `http://localhost:3000`
+
+## Deployment
+
+The game is deployed on Heroku. To deploy your own instance:
+
+1. Create a Heroku account and install the Heroku CLI
+2. Login to Heroku:
+```bash
+heroku login
+```
+
+3. Create a new Heroku app:
+```bash
+heroku create your-app-name
+```
+
+4. Push to Heroku:
+```bash
+git push heroku main
+```
+
+5. Open the app:
+```bash
+heroku open
+```
+
+## Environment Variables
+
+- `PORT`: Server port (default: 3000)
+- `HOST`: Server host (default: 0.0.0.0)
+- `CORS_ORIGIN`: CORS origin for Socket.IO (default: *)
+
+## License
+
+MIT
 
 ## Game Assets
 
