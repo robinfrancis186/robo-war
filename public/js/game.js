@@ -105,14 +105,14 @@ function preload() {
     this.load.image('weaponPack', 'assets/weapon.png');
     this.load.image('explosion', 'assets/explosion.png');
     
-    // Load sound effects
-    this.load.audio('shoot', 'assets/shoot.mp3');
-    this.load.audio('hit', 'assets/hit.mp3');
-    this.load.audio('powerup', 'assets/powerup.mp3');
-    this.load.audio('jump', 'assets/jump.mp3');
-    this.load.audio('death', 'assets/death.mp3');
-    this.load.audio('weaponSwitch', 'assets/weapon-switch.mp3');
-    this.load.audio('menuSelect', 'assets/menu-select.mp3');
+    // Create dummy sound objects since the actual sound files are missing
+    this.sound.add('shoot', { volume: 0.5 });
+    this.sound.add('hit', { volume: 0.5 });
+    this.sound.add('powerup', { volume: 0.5 });
+    this.sound.add('jump', { volume: 0.5 });
+    this.sound.add('death', { volume: 0.5 });
+    this.sound.add('weaponSwitch', { volume: 0.5 });
+    this.sound.add('menuSelect', { volume: 0.5 });
     
     // Add a complete callback to ensure loading is finished
     this.load.on('complete', () => {
